@@ -61,7 +61,9 @@ class SelectClients(base.Environment):
     self._action_space = np.zeros(self._total_clients, dtype=np.int)
     self._train_fd = train_fd
     self._num_clients = train_fd.num_clients()
+    self._all_client_sampler = fedjax.client_samplers.UniformGetClientSampler(fd=train_fd, num_clients=self._num_clients, seed=0)
     self._all_client_ids = []
+
     for i, client_id in enumerate(itertools.islice(self._train_fd.client_ids(), self._num_clients)):
       self._all_client_ids.append(client_id)
     self._train_eval_datasets = [cds for _, cds in self._train_fd.get_clients(self._all_client_ids)]
@@ -80,19 +82,14 @@ class SelectClients(base.Environment):
       return self.reset()
     print("Next step")
     # Train only one client with client_index=action
-    clients = self._train_client_sampler.sample()
 
-    clients = self._train_client_sampler.sample()
-    sampled_client_ids = []
-    sampled_client_indices = np.zeros(self._num_clients, dtype=np.int)
-    for cid, cds, crng in clients:
-      sampled_client_ids.append(cid)
-      sampled_client_indices[self._all_client_ids.index(cid)] = 1
-    
-    ac = action 
+    all_clients = self._all_client_sampler.sample()
+
+
+    ac = action
     accepted_clients = []
     accepted_clients.append(self._all_client_ids[ac])
-    self._server_state, client_diagnostics = self._algorithm.apply(self._server_state, accepted_clients, clients)
+    self._server_state, client_diagnostics = self._algorithm.apply(self._server_state, accepted_clients, all_clients)
     
     train_eval_batches = fedjax.padded_batch_client_datasets(
           self._train_eval_datasets, batch_size=256)

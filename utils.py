@@ -3,6 +3,7 @@ from haiku import nets
 import collections
 import random
 import numpy as np
+import itertools
 
 Params = collections.namedtuple("Params", "online target")
 ActorState = collections.namedtuple("ActorState", "count")
@@ -49,3 +50,11 @@ class ReplayBuffer(object):
 
   def is_ready(self, batch_size):
     return batch_size <= len(self.buffer)
+
+  def get_last(self, discount_factor, batch_size = 1):
+      '''
+      Get N last samples
+      '''
+      obs_tm1, a_tm1, r_t, discount_t, obs_t = zip(*list(itertools.islice(self.buffer, len(self.buffer) - batch_size, len(self.buffer))))
+      return (np.stack(obs_tm1), np.asarray(a_tm1), np.asarray(r_t),
+              np.asarray(discount_t) * discount_factor, np.stack(obs_t))

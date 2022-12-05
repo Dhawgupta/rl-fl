@@ -27,13 +27,14 @@ def run_loop(
   rng = hk.PRNGSequence(jax.random.PRNGKey(seed))
   params = agent.initial_params(next(rng))
   learner_state = agent.initial_learner_state(params)
-
+  timestep = environment.reset()
+  accumulator.push(timestep, None)
+  actor_state = agent.initial_actor_state()
   print(f"Training agent for {train_episodes} episodes")
   for episode in range(train_episodes):
+    print(episode)
     # Prepare agent, environment and accumulator for a new episode.
-    timestep = environment.reset()
-    accumulator.push(timestep, None)
-    actor_state = agent.initial_actor_state()
+
 
     tmp = True
     while tmp:
@@ -49,25 +50,30 @@ def run_loop(
       accumulator.push(timestep, action)
 
       # Learning.
+      print(accumulator.is_ready(batch_size), "Learning or not")
       if accumulator.is_ready(batch_size):
-        params, learner_state = agent.learner_step(
-            params, accumulator.sample(batch_size, discount_factor), learner_state, next(rng))
+        # params, learner_state = agent.learner_step(
+        #     params, accumulator.sample(batch_size, discount_factor), learner_state, next(rng))
+
+        params, learner_state = agent.learner_step(params, accumulator.get_last(discount_factor), learner_state, next(rng))
+      # Not using the replay buffer
+      # params, learner_state = agent.learner_step(params, (), learner_state, next(rng))
       tmp = False
 
-    # Evaluation.
-    if not episode % evaluate_every:
-      returns = 0.
-      for _ in range(eval_episodes):
-        timestep = environment.reset()
-        actor_state = agent.initial_actor_state()
-
-        tmp = True
-        while tmp:
-          actor_output, actor_state = agent.actor_step(
-              params, timestep, actor_state, next(rng), evaluation=True)
-          timestep = environment.step(int(actor_output.actions))
-          returns += timestep.reward
-          tmp = False
-
-      avg_returns = returns / eval_episodes
-      print(f"Episode {episode:4d}: Average returns: {avg_returns:.2f}")
+    # Evaluation. @dhawal, why is this exactly required ?
+    # if not episode % evaluate_every:
+    #   returns = 0.
+    #   for _ in range(eval_episodes):
+    #     timestep = environment.reset()
+    #     actor_state = agent.initial_actor_state()
+    #
+    #     tmp = True
+    #     while tmp:
+    #       actor_output, actor_state = agent.actor_step(
+    #           params, timestep, actor_state, next(rng), evaluation=True)
+    #       timestep = environment.step(int(actor_output.actions))
+    #       returns += timestep.reward
+    #       tmp = False
+    #
+    #   avg_returns = returns / eval_episodes
+    #   print(f"Episode {episode:4d}: Average returns: {avg_returns:.2f}")
