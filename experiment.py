@@ -20,7 +20,7 @@ import jax
 
 def run_loop(
     agent, environment, accumulator, seed,
-    batch_size, train_episodes, evaluate_every, eval_episodes):
+    batch_size, train_episodes, evaluate_every, eval_episodes, discount_factor):
   """A simple run loop for examples of reinforcement learning with rlax."""
 
   # Init agent.
@@ -51,7 +51,7 @@ def run_loop(
       # Learning.
       if accumulator.is_ready(batch_size):
         params, learner_state = agent.learner_step(
-            params, accumulator.sample(batch_size), learner_state, next(rng))
+            params, accumulator.sample(batch_size, discount_factor), learner_state, next(rng))
       tmp = False
 
     # Evaluation.
