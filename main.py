@@ -134,7 +134,7 @@ def main():
     )
 
     accumulator = ReplayBuffer(flags_replay_capacity)
-    experiment.run_loop(
+    params, learner_state, actor_state = experiment.run_loop(
         agent=agent,
         environment=env,
         accumulator=accumulator,
@@ -184,6 +184,14 @@ def main():
 
     # Save final trained model parameters to file.
     fedjax.serialization.save_state(server_state.params, '/tmp/params')
+    fedjax.serialization.save_state(params, '/tmp/dqn_params')
+    fedjax.serialization.save_state(learner_state, '/tmp/learner_state')
+    fedjax.serialization.save_state(actor_state, '/tmp/actor_state')
+
+    jnp.save('agent_params', params)
+    jnp.save('learner_state', learner_state)
+    jnp.save('actor_state', actor_state)
+    
 
 
 if __name__ == '__main__':
