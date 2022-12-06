@@ -23,6 +23,9 @@ from dm_env import specs
 import numpy as np
 import itertools
 import fedjax
+import jax
+import jax.numpy as jnp
+from absl import flags
 
 class SelectClients(base.Environment):
   """A Catch environment built on the dm_env.Environment class.
@@ -51,7 +54,7 @@ class SelectClients(base.Environment):
     self._algorithm = algorithm
     self._num_sampled_clients = num_sampled_clients
     self._train_client_sampler = train_client_sampler
-    self._rng = np.random.RandomState(seed)
+    self._rng = jax.random.PRNGKey(seed)
     self._state_space = None
     self._total_clients = total_clients
     self._obs_space = np.zeros(self._total_clients, dtype=np.float32)
@@ -62,6 +65,8 @@ class SelectClients(base.Environment):
     self._train_fd = train_fd
     self._num_clients = train_fd.num_clients()
     self._all_client_sampler = fedjax.client_samplers.UniformGetClientSampler(fd=train_fd, num_clients=self._num_clients, seed=0)
+    self._batch_hparams =fedjax.PaddedBatchHParams(batch_size=20)
+    
     self._all_client_ids = []
 
     for i, client_id in enumerate(itertools.islice(self._train_fd.client_ids(), self._num_clients)):
@@ -71,8 +76,12 @@ class SelectClients(base.Environment):
   def _reset(self) -> dm_env.TimeStep:
     """Returns the first `TimeStep` of a new episode."""
     self._reset_next_step = False
-    self._temp = np.random.rand(self._total_clients)
-    self._state_space = 2*(self._temp - 0.5)
+    key, self._rng = jax.random.split(self._rng)
+    new_init_params = self._model.init(key)
+    self._server_state = self._algorithm.init(new_init_params)
+
+   
+    self._state_space = self._create_state_space_server_space()
 
     return dm_env.restart(self._observation())
 
@@ -99,12 +108,12 @@ class SelectClients(base.Environment):
 
     reward = 2**(float(train_metrics['accuracy']) - self._target_acc)
 
-    # Do you need to change state_space?? 
+          # batches = self._train_fd.one_client_dataset_batch_federated_data(
 
-    # self._state_space = self._state_space - 0.01
-    # self._state_space[ac]+0.05
-    # self._state_space = np.clip(self._state_space, -1, 1)
-
+    self._state_space = self._create_state_space_server_space()
+    print(self._state_space)
+    print(jnp.sum(self._state_space))
+    
     return dm_env.transition(reward=reward, observation=self._observation())
 
   def observation_spec(self) -> specs.BoundedArray:
@@ -122,3 +131,21 @@ class SelectClients(base.Environment):
 
   def bsuite_info(self):
     return dict(total_regret=self._total_regret)
+
+  def _create_state_space_server_space(self):
+    '''
+    Define in terms of server state to get a new state of the MDP
+    '''
+    # self._server_state
+    clients_accuracy_num_examples = []
+    for cid in self._all_client_ids:
+      # batches = self._train_fd.one_client_dataset_batch_federated_data(
+      #   self._train_fd, cid, self._batch_hparams)
+      client_dataset = self._train_fd.get_client(cid)
+      batch = list(client_dataset.batch(batch_size=8))[:1]
+      client_num_examples = self._train_fd.client_size(cid)
+      results_metrics = fedjax.evaluate_model(self._model,self._server_state.params, batch)
+      # result_metrics = self._model.evaluate_model(self._model, self._server_state.params, batch)
+      clients_accuracy_num_examples.append(results_metrics['accuracy'])
+    return jnp.asarray(clients_accuracy_num_examples)
+    # return state_space
