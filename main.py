@@ -46,7 +46,7 @@ FLAGS = flags.FLAGS
 # flags.DEFINE_integer("seed", 42, "Random seed.")
 flags_seed=42
 # flags.DEFINE_integer("train_episodes", 301, "Number of train episodes.")
-flags_train_episodes = 1001
+flags_train_episodes = 10
 # flags.DEFINE_integer("batch_size", 32, "Size of the training batch")
 flags_batch_size = 8
 # flags.DEFINE_float("target_period", 50, "How often to update the target net.")
@@ -195,4 +195,5 @@ def main():
 
 
 if __name__ == '__main__':
+    # with jax.disable_jit():
     main()

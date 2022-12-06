@@ -36,7 +36,7 @@ def run_loop(
     actor_state = agent.initial_actor_state()
     print(f"Training agent for {train_episodes} episodes")
     for round in range(NUM_ROUNDS):
-      # print(Round)
+      print(f"Episode : {episode}, Round: {round}")
       # Prepare agent, environment and accumulator for a new episode.
 
 

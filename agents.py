@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 from utils import Params, ActorOutput, ActorState, LearnerState, Data
 import rlax
+import numpy as np
 
 
 class DQN:
@@ -97,7 +98,8 @@ class DQN:
     learner_count = jnp.zeros((), dtype=jnp.float32)
     opt_state = self._optimizer.init(params.online)
     return LearnerState(learner_count, opt_state)
-
+  
+  
   def actor_step(self, params, env_output, actor_state, key, evaluation):
     obs = jnp.expand_dims(env_output.observation, 0)  # add dummy batch
     q = self._network.apply(params.online, obs)[0]  # remove dummy batch
@@ -117,6 +119,12 @@ class DQN:
     online_params = optax.apply_updates(params.online, updates)
     return (Params(online_params, target_params),
             LearnerState(learner_state.count + 1, opt_state))
+
+  def actor_step_evaluation(self, params, env_output, actor_state, key, evaluation=True, k = 10):
+    obs = jnp.expand_dims(env_output.observation, 0)
+    q = self._network.apply(params.online, obs)[0]  # remove dummy batch
+    # Sort Q values 
+    return np.array(q)
 
   def _loss(self, online_params, target_params, obs_tm1, a_tm1, r_t, discount_t,
             obs_t):
