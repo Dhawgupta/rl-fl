@@ -47,7 +47,7 @@ flags_seed=42
 # flags.DEFINE_integer("train_episodes", 301, "Number of train episodes.")
 flags_train_episodes = 1001
 # flags.DEFINE_integer("batch_size", 32, "Size of the training batch")
-flags_batch_size = 1
+flags_batch_size = 8
 # flags.DEFINE_float("target_period", 50, "How often to update the target net.")
 flags_target_period = 50
 # flags.DEFINE_integer("replay_capacity", 2000, "Capacity of the replay buffer.")

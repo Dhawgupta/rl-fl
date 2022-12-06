@@ -52,10 +52,11 @@ def run_loop(
       # Learning.
       print(accumulator.is_ready(batch_size), "Learning or not")
       if accumulator.is_ready(batch_size):
-        # params, learner_state = agent.learner_step(
-        #     params, accumulator.sample(batch_size, discount_factor), learner_state, next(rng))
+        print("Using a batch of data")
+        params, learner_state = agent.learner_step(
+            params, accumulator.sample(batch_size, discount_factor), learner_state, next(rng))
 
-        params, learner_state = agent.learner_step(params, accumulator.get_last(discount_factor), learner_state, next(rng))
+      params, learner_state = agent.learner_step(params, accumulator.get_last(discount_factor), learner_state, next(rng))
       # Not using the replay buffer
       # params, learner_state = agent.learner_step(params, (), learner_state, next(rng))
       tmp = False
