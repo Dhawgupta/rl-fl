@@ -25,6 +25,7 @@ import itertools
 import fedjax
 import jax
 import jax.numpy as jnp
+from utils import UniformGetClientSampler
 from absl import flags
 
 class SelectClients(base.Environment):
@@ -63,14 +64,25 @@ class SelectClients(base.Environment):
     self._target_acc = target_acc
     self._action_space = np.zeros(self._total_clients, dtype=np.int)
     self._train_fd = train_fd
-    self._num_clients = train_fd.num_clients()
-    self._all_client_sampler = fedjax.client_samplers.UniformGetClientSampler(fd=train_fd, num_clients=self._num_clients, seed=0)
-    self._batch_hparams =fedjax.PaddedBatchHParams(batch_size=20)
-    
+    # self._num_clients = train_fd.num_clients()
+        
     self._all_client_ids = []
-
+    self._num_clients = self._total_clients
     for i, client_id in enumerate(itertools.islice(self._train_fd.client_ids(), self._num_clients)):
       self._all_client_ids.append(client_id)
+    self._all_client_ids = self._all_client_ids[:self._total_clients]
+    
+    
+    self._all_client_sampler = UniformGetClientSampler(
+      fd=train_fd,
+      num_clients=self._num_clients,
+      seed=69,
+      custom_client_ids=self._all_client_ids,
+      mal_clients=[])
+
+    # self._all_client_sampler = fedjax.client_samplers.UniformGetClientSampler(fd=train_fd, num_clients=self._num_clients, seed=0)
+    self._batch_hparams =fedjax.PaddedBatchHParams(batch_size=20)
+
     self._train_eval_datasets = [cds for _, cds in self._train_fd.get_clients(self._all_client_ids)]
 
   def _reset(self) -> dm_env.TimeStep:

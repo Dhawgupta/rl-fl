@@ -46,7 +46,7 @@ FLAGS = flags.FLAGS
 # flags.DEFINE_integer("seed", 42, "Random seed.")
 flags_seed=42
 # flags.DEFINE_integer("train_episodes", 301, "Number of train episodes.")
-flags_train_episodes = 10
+flags_train_episodes = 5
 # flags.DEFINE_integer("batch_size", 32, "Size of the training batch")
 flags_batch_size = 8
 # flags.DEFINE_float("target_period", 50, "How often to update the target net.")
@@ -70,6 +70,8 @@ flags_eval_episodes = 100
 # flags.DEFINE_integer("evaluate_every", 50,
 #                      "Number of episodes between evaluations.")
 flags_evaluate_every = 1
+
+flags_total_participating_clients = 50
 
 
 
@@ -118,7 +120,7 @@ def main():
     ############################  RL CODE HERE  ##################################
     env = select_clients.SelectClients(model=model, server_state=server_state, algorithm=algorithm,
                                        train_client_sampler=train_client_sampler, train_fd=train_fd,
-                                       num_sampled_clients=10, target_acc=0.99, total_clients=3400, seed=flags_seed)
+                                       num_sampled_clients=10, target_acc=0.99, total_clients=flags_total_participating_clients, seed=flags_seed)
     epsilon_cfg = dict(
         init_value=flags_epsilon_begin,
         end_value=flags_epsilon_end,

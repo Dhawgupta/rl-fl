@@ -16,8 +16,9 @@
 
 import haiku as hk
 import jax
+import fedjax
 
-NUM_ROUNDS = 500
+NUM_ROUNDS = 200
 def run_loop(
     agent, environment, accumulator, seed,
     batch_size, train_episodes, evaluate_every, eval_episodes, discount_factor):
@@ -61,6 +62,11 @@ def run_loop(
 
       params, learner_state = agent.learner_step(params, accumulator.get_last(discount_factor), learner_state, next(rng))
     
+      # fedjax.serialization.save_state(server_state.params, '/tmp/params')
+      fedjax.serialization.save_state(params, f'/tmp/dqn_params_ckp{episode}')
+      fedjax.serialization.save_state(learner_state, f'/tmp/learner_state_ckp{episode}')
+      fedjax.serialization.save_state(actor_state, f'/tmp/actor_state_ckp{episode}')
+
   return params, learner_state, actor_state
       # Not using the replay buffer
       # params, learner_state = agent.learner_step(params, (), learner_state, next(rng))
