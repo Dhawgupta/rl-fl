@@ -121,7 +121,7 @@ class DQN:
             LearnerState(learner_state.count + 1, opt_state))
 
   def actor_step_evaluation(self, params, env_output, actor_state, key, evaluation=True, k = 10):
-    obs = jnp.expand_dims(env_output.observation, 0)
+    obs = jnp.expand_dims(env_output, 0)
     q = self._network.apply(params.online, obs)[0]  # remove dummy batch
     # Sort Q values 
     return np.array(q)

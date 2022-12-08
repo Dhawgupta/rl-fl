@@ -18,7 +18,7 @@ import haiku as hk
 import jax
 import fedjax
 
-NUM_ROUNDS = 200
+NUM_ROUNDS = 50
 def run_loop(
     agent, environment, accumulator, seed,
     batch_size, train_episodes, evaluate_every, eval_episodes, discount_factor):

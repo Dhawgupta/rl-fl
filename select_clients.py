@@ -161,3 +161,18 @@ class SelectClients(base.Environment):
       clients_accuracy_num_examples.append(results_metrics['accuracy'])
     return jnp.asarray(clients_accuracy_num_examples)
     # return state_space
+
+  def _create_state_space_server_space_from_server_state(self, server_state):
+    # self._server_state
+    clients_accuracy_num_examples = []
+    for cid in self._all_client_ids:
+      # batches = self._train_fd.one_client_dataset_batch_federated_data(
+      #   self._train_fd, cid, self._batch_hparams)
+      client_dataset = self._train_fd.get_client(cid)
+      batch = list(client_dataset.batch(batch_size=8))[:1]
+      client_num_examples = self._train_fd.client_size(cid)
+      results_metrics = fedjax.evaluate_model(self._model,server_state.params, batch)
+      # result_metrics = self._model.evaluate_model(self._model, server_state.params, batch)
+      clients_accuracy_num_examples.append(results_metrics['accuracy'])
+    return jnp.asarray(clients_accuracy_num_examples)
+    # return state_space
