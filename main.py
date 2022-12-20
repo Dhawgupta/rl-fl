@@ -73,11 +73,13 @@ flags_evaluate_every = 1
 
 flags_total_participating_clients = 50
 
+flags_topk = 7
+
 
 
 def main():
     # Load train and test federated data for EMNIST.
-    train_fd, test_fd = fedjax.datasets.emnist.load_data(only_digits=False)
+    train_fd, val_fd = fedjax.datasets.emnist.load_data(only_digits=False)
 
     # Create CNN model with dropout.
     model = fedjax.models.emnist.create_conv_model(only_digits=False)
@@ -119,7 +121,7 @@ def main():
 
     ############################  RL CODE HERE  ##################################
     env = select_clients.SelectClients(model=model, server_state=server_state, algorithm=algorithm,
-                                       train_client_sampler=train_client_sampler, train_fd=train_fd,
+                                       train_client_sampler=train_client_sampler, train_fd=train_fd, val_fd=val_fd,
                                        num_sampled_clients=10, target_acc=0.99, total_clients=flags_total_participating_clients, seed=flags_seed)
     epsilon_cfg = dict(
         init_value=flags_epsilon_begin,
@@ -176,18 +178,35 @@ def main():
     for round_num in range(1,101):
       # Sample 10 clients per round without replacement for training.
       clients = env._all_client_sampler.sample()
-      
+      clients = clients[:10]
       # Run one round of training on sampled clients.
-      
-      
+
       env_state = env._create_state_space_server_space_from_server_state(server_state=server_state)
       q_values = agent.actor_step_evaluation(params, env_state, actor_state = None, key = None, evaluation=True, k = 10)
-      indices = np.flip(np.argsort(q_values))
-      topk_idx = indices[:20]
-      print(q_values[topk_idx])
-      print(topk_idx)
+      q_values_sampled_clients = []
+      q_values_sampled_clients_idx = []
+      for cid, _, _ in clients:
+        idx = env._all_client_ids.index(cid)
+        q_values_sampled_clients.append(q_values[idx])
+        q_values_sampled_clients_idx.append(idx)
+      
+      sorted_indices = np.flip(np.argsort(q_values_sampled_clients))
+      topk_sampled_indices = sorted_indices[:flags_topk]
+
       accepted_clients = []
-      [accepted_clients.append(env._all_client_ids[i]) for i in topk_idx]
+      [accepted_clients.append(clients[i][0]) for i in topk_sampled_indices]
+
+      
+      
+      print(f"accepted_clients: ", accepted_clients)
+
+      
+      # indices = np.flip(np.argsort(q_values))
+      # topk_idx = indices[:40]
+      # print(q_values[topk_idx])
+      # print(topk_idx)
+      # accepted_clients = []
+      # [accepted_clients.append(env._all_client_ids[i]) for i in topk_idx]
 
       server_state, client_diagnostics = algorithm.apply(server_state, accepted_clients, clients)
       print(f'[round {round_num}]')
@@ -226,7 +245,6 @@ def main():
     for round_num in range(1, 101):
       # Sample 10 clients per round without replacement for training.
       clients = env._all_client_sampler.sample()
-      
       # Run one round of training on sampled clients.
       
       
@@ -235,7 +253,7 @@ def main():
       indices = np.flip(np.argsort(q_values))
       cls = np.array(list(range(flags_total_participating_clients)))
       np.random.shuffle(cls)
-      topk_idx = cls[:20]
+      topk_idx = cls[:flags_topk]
       print(topk_idx)
       accepted_clients = []
       [accepted_clients.append(env._all_client_ids[i]) for i in topk_idx]

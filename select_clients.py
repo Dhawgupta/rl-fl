@@ -43,7 +43,7 @@ class SelectClients(base.Environment):
   The episode terminates when the ball reaches the bottom of the screen.
   """
 
-  def __init__(self, model, server_state, algorithm, train_client_sampler, train_fd, num_sampled_clients: int = 10, target_acc: float = 1.00, total_clients: int = 3400, seed: int = None):
+  def __init__(self, model, server_state, algorithm, train_client_sampler, train_fd, val_fd, num_sampled_clients: int = 10, target_acc: float = 1.00, total_clients: int = 3400, seed: int = None):
     """Initializes a new FL client selection environment.
 
     Args:
@@ -64,6 +64,7 @@ class SelectClients(base.Environment):
     self._target_acc = target_acc
     self._action_space = np.zeros(self._total_clients, dtype=np.int)
     self._train_fd = train_fd
+    self._val_fd = val_fd
     # self._num_clients = train_fd.num_clients()
         
     self._all_client_ids = []
@@ -84,6 +85,7 @@ class SelectClients(base.Environment):
     self._batch_hparams =fedjax.PaddedBatchHParams(batch_size=20)
 
     self._train_eval_datasets = [cds for _, cds in self._train_fd.get_clients(self._all_client_ids)]
+    self._val_eval_datasets = [cds for _, cds in self._val_fd.get_clients(self._all_client_ids)]
 
   def _reset(self) -> dm_env.TimeStep:
     """Returns the first `TimeStep` of a new episode."""
@@ -114,11 +116,15 @@ class SelectClients(base.Environment):
     
     train_eval_batches = fedjax.padded_batch_client_datasets(
           self._train_eval_datasets, batch_size=256)
+    val_eval_batches = fedjax.padded_batch_client_datasets(
+          self._val_eval_datasets, batch_size=256)
     train_metrics = fedjax.evaluate_model(self._model, self._server_state.params,
                                             train_eval_batches)
-    print('action= ', action, 'train_accuracy= ', float(train_metrics['accuracy']))
+    val_metrics = fedjax.evaluate_model(self._model, self._server_state.params,
+                                            val_eval_batches)
+    print('action= ', action, 'val_accuracy= ', float(val_metrics['accuracy']))
 
-    reward = 2**(float(train_metrics['accuracy']) - self._target_acc)
+    reward = 2**(float(val_metrics['accuracy']) - self._target_acc)
 
           # batches = self._train_fd.one_client_dataset_batch_federated_data(
 
