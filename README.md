@@ -8,3 +8,8 @@ To run MultiAction RL
 ```
 python main_list.py
 ```
+
+To plot 
+```
+python plot.py
+```
