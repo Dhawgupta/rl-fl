@@ -134,7 +134,39 @@ class SelectClients(base.Environment):
     
     return dm_env.transition(reward=reward, observation=self._observation())
 
+  def _step_list(self, action: list) -> dm_env.TimeStep:
+    """Updates the environment according to the action."""
+    if self._reset_next_step:
+      return self.reset()
+    print("Next step")
+    # Train only one client with client_index=action
 
+    all_clients = self._all_client_sampler.sample()
+    accepted_clients = []
+    for ac in action:
+      accepted_clients.append(self._all_client_ids[ac])
+
+    self._server_state, client_diagnostics = self._algorithm.apply(self._server_state, accepted_clients, all_clients)
+
+    train_eval_batches = fedjax.padded_batch_client_datasets(
+      self._train_eval_datasets, batch_size=256)
+    val_eval_batches = fedjax.padded_batch_client_datasets(
+      self._val_eval_datasets, batch_size=256)
+    train_metrics = fedjax.evaluate_model(self._model, self._server_state.params,
+                                          train_eval_batches)
+    val_metrics = fedjax.evaluate_model(self._model, self._server_state.params,
+                                        val_eval_batches)
+    print('action= ', action, 'val_accuracy= ', float(val_metrics['accuracy']))
+
+    reward = 2 ** (float(val_metrics['accuracy']) - self._target_acc)
+
+    # batches = self._train_fd.one_client_dataset_batch_federated_data(
+
+    self._state_space = self._create_state_space_server_space()
+    print(self._state_space)
+    print(jnp.sum(self._state_space))
+
+    return dm_env.transition(reward=reward, observation=self._observation())
   def observation_spec(self) -> specs.BoundedArray:
     """Returns the observation spec."""
     return specs.BoundedArray(shape=self._obs_space.shape, dtype=self._obs_space.dtype,

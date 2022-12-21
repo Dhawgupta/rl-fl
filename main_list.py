@@ -19,7 +19,7 @@ import random
 from absl import app
 from absl import flags
 from bsuite.environments import catch
-import select_clients
+import select_clients_list
 import haiku as hk
 from haiku import nets
 import jax
@@ -27,14 +27,15 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import rlax
-import experiment
+import experiment_list
 # from rlax.rlax._src.distributions import epsilon_greedy
 import fedjax
 import fed_avg
 from utils import build_network, ReplayBuffer
 from utils import Params, ActorState, ActorOutput, LearnerState, Data
 import itertools
-from agents import DQN
+from agents import DQNMultiAction
+import matplotlib.pyplot as plt
 
 # import sys
 # sys.argv = sys.argv[:1]
@@ -46,7 +47,7 @@ FLAGS = flags.FLAGS
 # flags.DEFINE_integer("seed", 42, "Random seed.")
 flags_seed=42
 # flags.DEFINE_integer("train_episodes", 301, "Number of train episodes.")
-flags_train_episodes = 5
+flags_train_episodes = 20
 # flags.DEFINE_integer("batch_size", 32, "Size of the training batch")
 flags_batch_size = 8
 # flags.DEFINE_float("target_period", 50, "How often to update the target net.")
@@ -64,7 +65,7 @@ flags_epsilon_steps = 1000
 # flags.DEFINE_float("discount_factor", 0.99, "Q-learning discount factor.")
 flags_discount_factor = 0.99
 # flags.DEFINE_float("learning_rate", 0.005, "Optimizer learning rate.")
-flags_learning_rate = 0.005
+flags_learning_rate = 0.05
 # flags.DEFINE_integer("eval_episodes", 100, "Number of evaluation episodes.")
 flags_eval_episodes = 100
 # flags.DEFINE_integer("evaluate_every", 50,
@@ -72,8 +73,9 @@ flags_eval_episodes = 100
 flags_evaluate_every = 1
 
 flags_total_participating_clients = 50
-
-flags_topk = 1
+flags_client_to_sample = 10
+flags_topk = 5
+eval_rounds = 50
 
 
 
@@ -82,7 +84,8 @@ def main():
     train_fd, val_fd = fedjax.datasets.emnist.load_data(only_digits=False)
 
     # Create CNN model with dropout.
-    model = fedjax.models.emnist.create_conv_model(only_digits=False)
+    # model = fedjax.models.emnist.create_conv_model(only_digits=False)
+    model = fedjax.models.emnist.create_dense_model(only_digits=False, hidden_units=400)
 
     # Scalar loss function with model parameters, batch of examples, and seed
     # PRNGKey as input.
@@ -120,7 +123,7 @@ def main():
         all_client_ids.append(client_id)
 
     ############################  RL CODE HERE  ##################################
-    env = select_clients.SelectClients(model=model, server_state=server_state, algorithm=algorithm,
+    env = select_clients_list.SelectClients(model=model, server_state=server_state, algorithm=algorithm,
                                        train_client_sampler=train_client_sampler, train_fd=train_fd, val_fd=val_fd,
                                        num_sampled_clients=10, target_acc=0.99, total_clients=flags_total_participating_clients, seed=flags_seed)
     epsilon_cfg = dict(
@@ -128,7 +131,7 @@ def main():
         end_value=flags_epsilon_end,
         transition_steps=flags_epsilon_steps,
         power=1.)
-    agent = DQN(
+    agent = DQNMultiAction(
         observation_spec=env.observation_spec(),
         action_spec=env.action_spec(),
         epsilon_cfg=epsilon_cfg,
@@ -138,7 +141,7 @@ def main():
     )
 
     accumulator = ReplayBuffer(flags_replay_capacity)
-    params, learner_state, actor_state = experiment.run_loop(
+    params, learner_state, actor_state, acc_list = experiment_list.run_loop(
         agent=agent,
         environment=env,
         accumulator=accumulator,
@@ -151,6 +154,11 @@ def main():
     )
     ##############################################################################
 
+    # make a plot for all episode
+    # for i,acc in enumerate(acc_list):
+    #     plt.plot(acc, label = f'{i}')
+    # plt.legend()
+    # plt.savefig('eps.png')
     
 
     # Save final trained model parameters to file.
@@ -175,10 +183,10 @@ def main():
                                             train_eval_batches)
     print('Intial [round {round_num}], train_metrics', float(train_metrics['accuracy']))
     rl_accuracy_array = [float(train_metrics['accuracy'])]
-    for round_num in range(1,101):
+    for round_num in range(1,eval_rounds):
       # Sample 10 clients per round without replacement for training.
       clients = env._all_client_sampler.sample()
-      clients = clients[:10]
+      clients = clients[:flags_client_to_sample]
       # Run one round of training on sampled clients.
 
       env_state = env._create_state_space_server_space_from_server_state(server_state=server_state)
@@ -191,7 +199,11 @@ def main():
         q_values_sampled_clients_idx.append(idx)
       
       sorted_indices = np.flip(np.argsort(q_values_sampled_clients))
+      # sorted_indices = np.argsort(q_values_sampled_clients)
+      # probs = jax.nn.softmax(q_values_sampled_clients)
+      # indices = np.random.choice(probs.shape[0], size = flags_topk, replace = False, p = probs)
       topk_sampled_indices = sorted_indices[:flags_topk]
+      # topk_sampled_indices = indices
 
       accepted_clients = []
       [accepted_clients.append(clients[i][0]) for i in topk_sampled_indices]
@@ -242,7 +254,7 @@ def main():
                                             train_eval_batches)
     print('Intial [round {round_num}], train_metrics', float(train_metrics['accuracy']))
     random_accuracy_array= [float(train_metrics['accuracy'])]
-    for round_num in range(1, 101):
+    for round_num in range(1, eval_rounds):
       # Sample 10 clients per round without replacement for training.
       clients = env._all_client_sampler.sample()
       # Run one round of training on sampled clients.
@@ -279,10 +291,18 @@ def main():
     
     rl_accuracy_array = np.array(rl_accuracy_array)
     random_accuracy_array = np.array(random_accuracy_array)
+    plt.plot(rl_accuracy_array, label='rl_final')
+    plt.plot(random_accuracy_array, label='random_final')
+    for i,acc in enumerate(acc_list):
+        plt.plot(acc, label = f'{i}')
+    plt.legend()
+    plt.savefig('final.png')
     np.save('rl_array',rl_accuracy_array)
     np.save('random_array',random_accuracy_array)
 
 
 if __name__ == '__main__':
+    # with jax.disable_jit():
+    #     main()
     # with jax.disable_jit():
     main()

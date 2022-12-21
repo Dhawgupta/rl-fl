@@ -148,6 +148,4 @@ class DQNMultiAction:
     td_error = 0
     for i in range(self.select_k):
       td_error += batched_loss(q_tm1, a_tm1[:,i], r_t, discount_t, q_t_val, q_t_select)
-      # td_error += batched_loss(q_tm1, a_tm1[:, i], jax.lax.stop_gradient( obs_t[:, a_tm1[:, i]] - obs_tm1[:, a_tm1[:, i]]).reshape([-1]), discount_t, q_t_val, q_t_select)
-
     return jnp.mean(rlax.l2_loss(td_error))
